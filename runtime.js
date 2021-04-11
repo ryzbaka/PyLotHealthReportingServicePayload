@@ -31,7 +31,7 @@ io.sockets.on("connection",client=>{
     ptyProcess.on('data',data=>{
         client.emit('send-output',data);
     })
-    client.on('test-sketch-socket',(data)=>{
+    client.on('test-sketch-socket',(data)=>{ //saves notebook
         console.log(data);
         axios.post("http://localhost:5200/replicateNotebook",data).then(({data})=>{
             console.log(data)
@@ -67,16 +67,21 @@ app.get("/testAPI",(req,res)=>{
     })
 })
 
-app.get("/runTile",(req,res)=>{
-    axios.get("http://localhost:5200/checkOnline")
-    .then(({data}) => {
-        if (data.message===1){
-            axios.post("http://localhost:5200/runTile",{notebookName:"Notebook1",tileName:"Tile1"})
-            .then(({data})=>res.send(data))
-        }
-        else{
-            res.json({message:"Python code execution engine is offline."})
-        }
+app.post("/runTile",(req,res)=>{ //convert this to a post request that takes in notebookName and tileName
+    // axios.get("http://localhost:5200/checkOnline")
+    // .then(({data}) => {
+    //     if (data.message===1){
+    //         axios.post("http://localhost:5200/runTile",{notebookName:"nb1",tileName:"tile3"})
+    //         .then(({data})=>res.send(data))
+    //     }
+    //     else{
+    //         res.json({message:"Python code execution engine is offline."})
+    //     }
+    // }) HEY MAN, FIX THIS CODE
+    const {notebookName,tileName} = req.body;
+    axios.post("http://localhost:5200/runTile",{notebookName:notebookName,tileName:tileName}).then(({data})=>{
+        // console.log(data)
+        res.json(data)
     })
 }) //convert this into a websocket response tied to the server.
 
