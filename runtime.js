@@ -5,6 +5,7 @@ const pty = require('node-pty');
 const utils = require('os-utils');
 const express = require('express');
 const bodyParser = require('body-parser');
+const { captureRejectionSymbol } = require('events');
 
 
 const PORT = 5000
@@ -31,10 +32,45 @@ io.sockets.on("connection",client=>{
     ptyProcess.on('data',data=>{
         client.emit('send-output',data);
     })
+    client.on("fetch-data",(data)=>{
+        console.log("fetch-code triggered")
+        console.log(data)
+        axios.post("http://localhost:5200/fetchOutput",data).then(({data})=>{
+            client.emit("got-data",data);
+        }).catch(err=>{
+            // client.emit("ran-tile",{"error":err.message});
+            client.emit("fetch-data-error",err)
+        })
+    })
+    client.on("schedule-dag",({notebookName,minutes})=>{
+        console.log(`Received socket command to schedule ${notebookName} to run every ${minutes} minutes.`)
+        axios.post("http://localhost:5200/scheduleNotebook",{
+            notebookName:notebookName,
+            minutes:minutes
+        }).then(({data:{message}})=>{
+            client.emit("scheduled-dag",{message:message})
+        })
+    })
+    client.on("cancel-job",({notebookName})=>{
+        console.log(`Received request to cancel scheduled workflow with ID: ${notebookName}`);
+        axios.post("http://localhost:5200/removeJob",{
+            notebook:notebookName
+        }).then(({data:{message}})=>{
+            client.emit("cancelled-job",{message:message});
+        })
+    })
+    client.on('run-tile',(data)=>{ //saves notebook
+        const {notebookName,tileName} = data;
+        axios.post("http://localhost:5200/runTile",{notebookName:notebookName,tileName:tileName}).then(({data})=>{
+            client.emit("ran-tile",data)
+        }).catch(err=>{
+            client.emit("ran-tile",{"error":err.message});
+        })
+    })
     client.on('test-sketch-socket',(data)=>{ //saves notebook
         console.log(data);
         axios.post("http://localhost:5200/replicateNotebook",data).then(({data})=>{
-            console.log(data)
+            console.log("lmao")
         })
     })
     client.on('run-command',command=>{
@@ -82,6 +118,8 @@ app.post("/runTile",(req,res)=>{ //convert this to a post request that takes in 
     axios.post("http://localhost:5200/runTile",{notebookName:notebookName,tileName:tileName}).then(({data})=>{
         // console.log(data)
         res.json(data)
+    }).catch(err=>{
+        res.json({error:err.message})
     })
 }) //convert this into a websocket response tied to the server.
 
